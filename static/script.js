@@ -2,63 +2,6 @@
  * 门店商品经营AI分析助手 - 前端脚本
  */
 
-// ==================== 配置管理 ====================
-const CONFIG_KEY = 'retail_ai_config';
-
-function getConfig() {
-  const raw = localStorage.getItem(CONFIG_KEY);
-  if (raw) return JSON.parse(raw);
-  return {
-    baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
-    apiKey: '',
-    model: 'doubao-1-5-pro-256k-250115'
-  };
-}
-
-function saveConfig() {
-  const config = {
-    baseUrl: document.getElementById('cfgBaseUrl').value || 'https://ark.cn-beijing.volces.com/api/v3',
-    apiKey: document.getElementById('cfgApiKey').value.trim(),
-    model: document.getElementById('cfgModel').value || 'doubao-1-5-pro-256k-250115'
-  };
-  localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
-  alert('配置已保存！');
-  checkConfig();
-}
-
-function toggleConfig() {
-  const panel = document.getElementById('configPanel');
-  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-  if (panel.style.display === 'block') {
-    const cfg = getConfig();
-    document.getElementById('cfgBaseUrl').value = cfg.baseUrl;
-    document.getElementById('cfgApiKey').value = cfg.apiKey;
-    document.getElementById('cfgModel').value = cfg.model;
-  }
-}
-
-async function checkConfig() {
-  const cfg = getConfig();
-  const alertEl = document.getElementById('configAlert');
-
-  try {
-    const resp = await fetch('/api/config');
-    const serverCfg = await resp.json();
-    if (serverCfg.has_api_key) {
-      alertEl.style.display = 'none';
-      return;
-    }
-  } catch (err) {
-    console.warn('读取服务端配置失败', err);
-  }
-
-  if (cfg.apiKey) {
-    alertEl.style.display = 'none';
-  } else {
-    alertEl.style.display = 'flex';
-  }
-}
-
 // ==================== 示例数据 ====================
 const EXAMPLE_DATA = {
   totalSku: '1200',
@@ -90,7 +33,7 @@ function fillExample() {
 }
 
 function clearForm() {
-  const inputs = document.querySelectorAll('#inputPage input[type="text"], #inputPage input[type="password"]');
+  const inputs = document.querySelectorAll('#inputPage input[type="text"]');
   inputs.forEach(i => i.value = '');
 }
 
@@ -222,16 +165,6 @@ function splitReport(content) {
 // ==================== 生成报告 ====================
 let currentReportRaw = '';
 
-async function readJsonResponse(resp) {
-  const text = await resp.text();
-  try {
-    return JSON.parse(text);
-  } catch (err) {
-    const brief = text.replace(/\s+/g, ' ').slice(0, 300);
-    throw new Error(brief || `服务返回了非JSON内容（HTTP ${resp.status}）`);
-  }
-}
-
 async function generateReport() {
   const data = collectData();
 
@@ -246,36 +179,80 @@ async function generateReport() {
   currentReportRaw = '';
 
   try {
-    // 优先使用同步接口获取完整内容
-    const resp = await fetch('/api/analyze-sync', {
+    const resp = await fetch('/api/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
 
     if (!resp.ok) {
-      const err = await readJsonResponse(resp);
-      throw new Error(err.error || '请求失败');
+      const text = await resp.text();
+      throw new Error(text.replace(/\s+/g, ' ').slice(0, 300) || `请求失败（HTTP ${resp.status}）`);
     }
 
-    const result = await readJsonResponse(resp);
-    currentReportRaw = result.content || result;
-
-    // 切换到结果页
     document.getElementById('inputPage').classList.remove('active');
     document.getElementById('resultPage').classList.add('active');
-
-    // 解析并渲染
-    renderReport(currentReportRaw);
-
-    // 滚动到顶部
+    renderReport('正在生成报告，请稍候...');
     window.scrollTo(0, 0);
+
+    await readStreamedReport(resp);
+
+    if (!currentReportRaw.trim()) {
+      throw new Error('AI没有返回报告内容，请稍后重试');
+    }
+
+    renderReport(currentReportRaw);
 
   } catch (err) {
     alert('生成报告失败：' + err.message);
     console.error(err);
   } finally {
     loading.classList.remove('active');
+  }
+}
+
+async function readStreamedReport(resp) {
+  if (!resp.body) {
+    throw new Error('当前浏览器不支持流式读取响应');
+  }
+
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  let buffer = '';
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const events = buffer.split('\n\n');
+    buffer = events.pop() || '';
+
+    for (const event of events) {
+      const lines = event.split('\n');
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+
+        const payload = line.slice(6).trim();
+        if (!payload) continue;
+
+        let chunk;
+        try {
+          chunk = JSON.parse(payload);
+        } catch (err) {
+          continue;
+        }
+
+        if (chunk.error) {
+          throw new Error(chunk.error);
+        }
+
+        if (chunk.content) {
+          currentReportRaw += chunk.content;
+          renderReport(currentReportRaw);
+        }
+      }
+    }
   }
 }
 
@@ -348,9 +325,4 @@ window.addEventListener('scroll', () => {
     const activeLi = document.querySelector(`[data-target="${current}"]`);
     if (activeLi) activeLi.classList.add('active');
   }, 100);
-});
-
-// ==================== 初始化 ====================
-document.addEventListener('DOMContentLoaded', () => {
-  checkConfig();
 });

@@ -195,7 +195,8 @@ async def analyze(data: StoreData):
     async def generate():
         async with httpx.AsyncClient(timeout=120.0) as client:
             try:
-                response = await client.post(
+                async with client.stream(
+                    "POST",
                     f"{AI_BASE_URL.rstrip('/')}/chat/completions",
                     headers={
                         "Authorization": f"Bearer {AI_API_KEY}",
@@ -211,29 +212,35 @@ async def analyze(data: StoreData):
                         "temperature": 0.7,
                         "max_tokens": 8000
                     }
-                )
+                ) as response:
 
-                if response.status_code >= 400:
-                    message = f"AI接口请求失败（HTTP {response.status_code}）：{parse_ai_error(response)}"
-                    yield f"data: {json.dumps({'error': message}, ensure_ascii=False)}\n\n"
-                    return
-                
-                async for line in response.aiter_lines():
-                    if line.startswith("data: "):
-                        data_str = line[6:]
-                        if data_str == "[DONE]":
-                            break
-                        try:
-                            chunk = json.loads(data_str)
-                            delta = chunk["choices"][0]["delta"]
-                            if "content" in delta:
-                                content = delta["content"]
-                                yield f"data: {json.dumps({'content': content})}\n\n"
-                        except (json.JSONDecodeError, KeyError):
-                            continue
+                    if response.status_code >= 400:
+                        text = await response.aread()
+                        error_response = httpx.Response(
+                            response.status_code,
+                            content=text,
+                            headers=response.headers,
+                        )
+                        message = f"AI接口请求失败（HTTP {response.status_code}）：{parse_ai_error(error_response)}"
+                        yield f"data: {json.dumps({'error': message}, ensure_ascii=False)}\n\n"
+                        return
+
+                    async for line in response.aiter_lines():
+                        if line.startswith("data: "):
+                            data_str = line[6:]
+                            if data_str == "[DONE]":
+                                break
+                            try:
+                                chunk = json.loads(data_str)
+                                delta = chunk["choices"][0]["delta"]
+                                if "content" in delta:
+                                    content = delta["content"]
+                                    yield f"data: {json.dumps({'content': content}, ensure_ascii=False)}\n\n"
+                            except (json.JSONDecodeError, KeyError):
+                                continue
                             
             except Exception as e:
-                yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
     
     return StreamingResponse(generate(), media_type="text/event-stream")
 

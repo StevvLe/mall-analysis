@@ -27,40 +27,12 @@
 
     <!-- ========== 输入页面 ========== -->
     <div id="inputPage" class="page active">
-      <!-- API Config Alert -->
-      <div id="configAlert" class="alert alert-warning" style="display:none;">
-        ⚠️ 未检测到AI API Key配置，请点击下方「配置API」按钮进行设置，否则无法生成分析报告。
-      </div>
-
       <!-- Toolbar -->
       <div class="toolbar">
         <button class="btn btn-secondary" onclick="fillExample()">📋 填入示例数据</button>
         <button class="btn btn-secondary" onclick="clearForm()">🗑️ 清空表单</button>
-        <button class="btn btn-secondary" onclick="toggleConfig()">⚙️ 配置API</button>
         <div style="flex:1"></div>
         <button class="btn btn-primary" onclick="generateReport()">🚀 生成分析报告</button>
-      </div>
-
-      <!-- Config Panel -->
-      <div id="configPanel" class="config-panel" style="display:none;">
-        <div class="config-panel-title">API 配置（数据仅存储在浏览器本地）</div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>API Base URL</label>
-            <input type="text" id="cfgBaseUrl" placeholder="https://ark.cn-beijing.volces.com/api/v3">
-          </div>
-          <div class="form-group">
-            <label>API Key <span class="required">*</span></label>
-            <input type="password" id="cfgApiKey" placeholder="请输入您的AI API Key">
-          </div>
-          <div class="form-group">
-            <label>模型名称</label>
-            <input type="text" id="cfgModel" placeholder="doubao-1-5-pro-256k-250115">
-          </div>
-        </div>
-        <div style="text-align:right;">
-          <button class="btn btn-primary" onclick="saveConfig()" style="font-size:0.85rem;padding:0.4rem 0.8rem;">保存配置</button>
-        </div>
       </div>
 
       <!-- SKU Structure -->
