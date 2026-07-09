@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>门店商品经营AI分析助手</title>
+<style>
+  :root {
+    --primary: #1a365d;
+    --primary-light: #2c5282;
+    --accent: #d69e2e;
+    --accent-light: #ecc94b;
+    --bg: #f0f4f8;
+    --card: #ffffff;
+    --text: #1a202c;
+    --text2: #4a5568;
+    --border: #e2e8f0;
+    --danger: #e53e3e;
+    --success: #38a169;
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-top: env(safe-area-inset-top, 0px);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html { font-size: 16px; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg); color: var(--text);
+    line-height: 1.6; min-height: 100vh;
+    padding-bottom: calc(80px + var(--safe-bottom));
+    overscroll-behavior-y: none;
+  }
+
+  .header {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    color: #fff; padding: 1.25rem 1rem calc(1rem + var(--safe-top));
+    text-align: center; position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 2px 8px rgba(26,54,93,0.2);
+  }
+  .header h1 { font-size: 1.15rem; font-weight: 700; }
+  .header p { font-size: 0.75rem; opacity: 0.9; margin-top: 0.25rem; }
+  .header .tag {
+    display: inline-block; background: var(--accent); color: var(--primary);
+    padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.65rem;
+    font-weight: 700; margin-top: 0.4rem;
+  }
+
+  .page { display: none; animation: fadeIn 0.3s ease; }
+  .page.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  .card {
+    background: var(--card); border-radius: 0.875rem;
+    margin: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    overflow: hidden;
+  }
+  .card-hd {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.875rem 1rem; background: linear-gradient(90deg, #f7fafc, #fff);
+    border-bottom: 1px solid var(--border);
+  }
+  .card-hd .icon {
+    width: 32px; height: 32px; border-radius: 0.5rem;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem; flex-shrink: 0;
+  }
+  .card-hd h3 { font-size: 0.95rem; font-weight: 700; color: var(--primary); }
+  .card-hd p { font-size: 0.7rem; color: var(--text2); margin-top: 0.1rem; }
+  .card-bd { padding: 0.875rem 1rem; }
+  .card.collapsed .card-bd { display: none; }
+  .card.collapsed .card-hd { border-bottom: none; }
+
+  .ic-sku { background: #ebf8ff; }
+  .ic-sales { background: #f0fff4; }
+  .ic-cat { background: #fffaf0; }
+  .ic-opt { background: #faf5ff; }
+  .ic-config { background: #fff5f5; }
+
+  .fg { margin-bottom: 0.75rem; }
+  .fg label {
+    display: block; font-size: 0.8rem; font-weight: 600;
+    color: var(--text); margin-bottom: 0.3rem;
+  }
+  .fg .req { color: var(--danger); }
+  .fg input, .fg textarea, .fg select {
+    width: 100%; padding: 0.65rem 0.8rem;
+    border: 1.5px solid var(--border); border-radius: 0.625rem;
+    font-size: 0.9rem; background: #fff; color: var(--text);
+    -webkit-appearance: none; appearance: none;
+  }
+  .fg input:focus, .fg textarea:focus {
+    outline: none; border-color: var(--primary-light);
+    box-shadow: 0 0 0 3px rgba(26,54,93,0.08);
+  }
+  .fg .hint { font-size: 0.7rem; color: var(--text2); margin-top: 0.2rem; }
+  .fg-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.625rem; }
+  @media (min-width: 480px) { .fg-row { grid-template-columns: repeat(3, 1fr); } }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    gap: 0.3rem; padding: 0.6rem 1rem; border-radius: 0.625rem;
+    border: none; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+    transition: transform 0.15s, opacity 0.15s; -webkit-appearance: none;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    color: #fff; box-shadow: 0 2px 6px rgba(26,54,93,0.25);
+  }
+  .btn-accent {
+    background: linear-gradient(135deg, var(--accent), var(--accent-light));
+    color: var(--primary);
+  }
+  .btn-outline {
+    background: #fff; color: var(--primary);
+    border: 1.5px solid var(--border);
+  }
+  .btn-sm { padding: 0.4rem 0.7rem; font-size: 0.78rem; }
+
+  .toolbar {
+    display: flex; gap: 0.5rem; padding: 0.75rem;
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .toolbar::-webkit-scrollbar { display: none; }
+
+  .fab-wrap {
+    position: fixed; bottom: calc(0.75rem + var(--safe-bottom));
+    left: 0.75rem; right: 0.75rem; z-index: 200;
+    display: flex; gap: 0.5rem;
+  }
+  .fab-wrap .btn { flex: 1; padding: 0.85rem; font-size: 0.95rem; border-radius: 0.75rem; }
+
+  .config-panel {
+    background: #f7fafc; border: 1.5px dashed var(--border);
+    border-radius: 0.75rem; padding: 0.875rem; margin: 0.75rem;
+  }
+  .config-panel h4 { font-size: 0.8rem; color: var(--text2); margin-bottom: 0.625rem; }
+
+  .cfg-status {
+    display: flex; align-items: center; gap: 0.4rem;
+    font-size: 0.75rem; padding: 0.4rem 0.75rem;
+    border-radius: 0.5rem; margin: 0 0.75rem 0.5rem;
+  }
+  .cfg-status.ok { background: #f0fff4; color: #276749; border: 1px solid #9ae6b4; }
+  .cfg-status.warn { background: #fffaf0; color: #975a16; border: 1px solid #fbd38d; }
+  .cfg-status.err { background: #fff5f5; color: #c53030; border: 1px solid #feb2b2; }
+
+  .loading-mask {
+    position: fixed; inset: 0; background: rgba(255,255,255,0.96);
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 500;
+  }
+  .loading-mask.active { display: flex; }
+  .spinner {
+    width: 48px; height: 48px;
+    border: 4px solid var(--border); border-top-color: var(--primary);
+    border-radius: 50%; animation: spin 1s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-mask h3 { margin-top: 1rem; font-size: 1rem; color: var(--primary); }
+  .loading-mask p { font-size: 0.75rem; color: var(--text2); margin-top: 0.3rem; }
+  .loading-mask .cancel-btn {
+    margin-top: 1.5rem; padding: 0.5rem 1.2rem;
+    background: #fff; border: 1.5px solid var(--border);
+    border-radius: 0.5rem; font-size: 0.8rem; color: var(--text2);
+  }
+
+  .error-panel {
+    background: #fff5f5; border: 1.5px solid #feb2b2;
+    border-radius: 0.75rem; padding: 1rem; margin: 0.75rem;
+  }
+  .error-panel h4 { color: #c53030; font-size: 0.9rem; margin-bottom: 0.5rem; }
+  .error-panel pre {
+    background: #fff; padding: 0.5rem; border-radius: 0.4rem;
+    font-size: 0.75rem; color: var(--text); overflow-x: auto;
+    white-space: pre-wrap; word-break: break-all;
+    max-height: 200px; overflow-y: auto;
+  }
+  .error-panel .hint-box {
+    background: #fffaf0; border: 1px solid #fbd38d;
+    border-radius: 0.4rem; padding: 0.5rem; margin-top: 0.5rem;
+    font-size: 0.75rem; color: #975a16;
+  }
+
+  .result-nav {
+    position: sticky; top: calc(60px + var(--safe-top));
+    background: var(--bg); z-index: 90; padding: 0.5rem 0.75rem;
+    display: flex; gap: 0.4rem; overflow-x: auto;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch;
+    border-bottom: 1px solid var(--border);
+  }
+  .result-nav::-webkit-scrollbar { display: none; }
+  .nav-chip {
+    padding: 0.35rem 0.7rem; border-radius: 999px;
+    font-size: 0.75rem; font-weight: 600; white-space: nowrap;
+    background: #fff; color: var(--text2); border: 1px solid var(--border);
+    cursor: pointer; transition: all 0.2s;
+  }
+  .nav-chip.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+  .section { padding: 0.75rem; }
+  .section-hd {
+    display: flex; align-items: center; gap: 0.4rem;
+    font-size: 1rem; font-weight: 700; color: var(--primary);
+    margin-bottom: 0.625rem; padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--border);
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .dot-blue { background: var(--primary); }
+  .dot-gold { background: var(--accent); }
+  .dot-green { background: var(--success); }
+
+  .report-body { font-size: 0.88rem; line-height: 1.85; color: var(--text); }
+  .report-body h1, .report-body h2, .report-body h3, .report-body h4 {
+    color: var(--primary); margin: 1rem 0 0.5rem; font-weight: 700;
+  }
+  .report-body h1 { font-size: 1.05rem; border-bottom: 2px solid var(--accent); padding-bottom: 0.35rem; }
+  .report-body h2 { font-size: 0.98rem; }
+  .report-body h3 { font-size: 0.92rem; }
+  .report-body p { margin-bottom: 0.6rem; }
+  .report-body ul, .report-body ol { margin: 0.4rem 0 0.6rem 1.2rem; }
+  .report-body li { margin-bottom: 0.3rem; }
+  .report-body strong { color: var(--primary); }
+  .report-body blockquote {
+    border-left: 3px solid var(--accent); background: #fffaf0;
+    padding: 0.5rem 0.75rem; margin: 0.5rem 0; border-radius: 0 0.4rem 0.4rem 0;
+  }
+  .report-body table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto; display: block; }
+  .report-body th, .report-body td { border: 1px solid var(--border); padding: 0.4rem 0.5rem; text-align: left; }
+  .report-body th { background: var(--primary); color: #fff; }
+  .report-body tr:nth-child(even) { background: #f8fafc; }
+
+  .acard {
+    background: linear-gradient(135deg, #f7fafc, #fff);
+    border: 1.5px solid var(--border); border-radius: 0.625rem;
+    padding: 0.875rem; margin-bottom: 0.625rem;
+    display: flex; gap: 0.625rem;
+  }
+  .acard-num {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--accent); color: #fff; font-weight: 700;
+    font-size: 0.8rem; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .acard h4 { font-size: 0.88rem; font-weight: 700; color: var(--primary); margin-bottom: 0.15rem; }
+  .acard p { font-size: 0.78rem; color: var(--text2); }
+
+  .alert {
+    padding: 0.625rem 0.875rem; border-radius: 0.5rem;
+    margin: 0.75rem; font-size: 0.8rem; display: flex; align-items: center; gap: 0.4rem;
+  }
+  .alert-warn { background: #fffaf0; border: 1.5px solid #fbd38d; color: #975a16; }
+  .alert-info { background: #ebf8ff; border: 1.5px solid #90cdf4; color: #2a4365; }
+  .alert-ok { background: #f0fff4; border: 1.5px solid #9ae6b4; color: #276749; }
+
+  .toast {
+    position: fixed; top: calc(1rem + var(--safe-top)); left: 50%; transform: translateX(-50%) translateY(-100px);
+    background: rgba(26,54,93,0.9); color: #fff; padding: 0.6rem 1.2rem;
+    border-radius: 0.5rem; font-size: 0.85rem; z-index: 600;
+    transition: transform 0.3s ease; white-space: nowrap;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  .divider { height: 1px; background: var(--border); margin: 0.5rem 0; }
+
+  @media print {
+    .header, .fab-wrap, .toolbar, .result-nav, .loading-mask { display: none !important; }
+    body { padding-bottom: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div id="toast" class="toast"></div>
+
+<div id="loadingMask" class="loading-mask">
+  <div class="spinner"></div>
+  <h3>AI正在分析门店数据...</h3>
+  <p id="loadingText">正在连接AI服务，请稍候</p>
+  <button class="cancel-btn" onclick="cancelRequest()">取消</button>
+</div>
+
+<header class="header">
+  <h1>门店商品经营AI分析助手</h1>
+  <p>易物+悦人 双轨共生 · 智能经营建议</p>
+  <span class="tag">AI驱动 · 数据赋能</span>
+</header>
+
+<!-- ========== 输入页 ========== -->
+<div id="pageInput" class="page active">
+
+  <div id="cfgStatus" class="cfg-status warn" style="display:none;"></div>
+
+  <div class="toolbar">
+    <button class="btn btn-outline btn-sm" onclick="fillExample()">📋 示例数据</button>
+    <button class="btn btn-outline btn-sm" onclick="clearAll()">🗑️ 清空</button>
+    <button class="btn btn-outline btn-sm" onclick="toggleConfig()">⚙️ 配置API</button>
+  </div>
+
+  <div id="configPanel" class="config-panel" style="display:none;">
+    <h4>🔧 AI API配置（仅保存在本机浏览器）</h4>
+    <div class="fg">
+      <label>接口地址</label>
+      <select id="apiPreset" onchange="applyPreset()">
+        <option value="custom">自定义</option>
+        <option value="volc" selected>火山方舟（豆包）</option>
+        <option value="openai">OpenAI</option>
+        <option value="dashscope">阿里云百炼</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label>Base URL</label>
+      <input type="text" id="baseUrl" value="https://ark.cn-beijing.volces.com/api/v3">
+    </div>
+    <div class="fg">
+      <label>API Key <span class="req">*</span></label>
+      <input type="password" id="apiKey" placeholder="请输入您的API Key">
+    </div>
+    <div class="fg">
+      <label>模型 / 推理接入点ID</label>
+      <input type="text" id="modelName" value="doubao-1-5-pro-256k-250115">
+      <p class="hint">火山方舟请填 ep- 开头的推理接入点ID，不是模型名</p>
+    </div>
+    <div style="display:flex;gap:0.5rem;margin-top:0.5rem;">
+      <button class="btn btn-primary btn-sm" style="flex:1;" onclick="saveConfig()">💾 保存配置</button>
+      <button class="btn btn-outline btn-sm" onclick="testApi()">🔌 测试连接</button>
+    </div>
+  </div>
+
+  <div id="errorPanel" class="error-panel" style="display:none;">
+    <h4>❌ 生成失败</h4>
+    <pre id="errorDetail"></pre>
+    <div id="errorHint" class="hint-box" style="display:none;"></div>
+  </div>
+
+  <div class="card" id="cardSku">
+    <div class="card-hd" onclick="toggleCard('cardSku')">
+      <div class="icon ic-sku">📦</div>
+      <div>
+        <h3>SKU结构</h3>
+        <p>鞋服配占比、新品/滞销品、话题性SKU</p>
+      </div>
+    </div>
+    <div class="card-bd">
+      <div class="fg">
+        <label>总SKU量 <span class="req">*</span></label>
+        <input type="text" id="totalSku" inputmode="numeric" placeholder="例如：1200">
+      </div>
+      <div class="fg-row">
+        <div class="fg"><label>鞋SKU占比</label><input type="text" id="shoeSku" placeholder="35%"></div>
+        <div class="fg"><label>服SKU占比</label><input type="text" id="clothingSku" placeholder="50%"></div>
+        <div class="fg"><label>配SKU占比</label><input type="text" id="accessorySku" placeholder="15%"></div>
+      </div>
+      <div class="fg-row">
+        <div class="fg"><label>新品占比</label><input type="text" id="newSku" placeholder="30%"></div>
+        <div class="fg"><label>滞销品占比</label><input type="text" id="stagnantSku" placeholder="20%"></div>
+        <div class="fg"><label>话题性SKU占比</label><input type="text" id="联名Sku" placeholder="8%"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="cardSales">
+    <div class="card-hd" onclick="toggleCard('cardSales')">
+      <div class="icon ic-sales">📊</div>
+      <div>
+        <h3>进销存表现</h3>
+        <p>销售、动销率、周转、售罄率</p>
+      </div>
+    </div>
+    <div class="card-bd">
+      <div class="fg">
+        <label>各品类销售额/销量占比 <span class="req">*</span></label>
+        <input type="text" id="salesAmountRatio" placeholder="鞋45% / 服40% / 配15%">
+      </div>
+      <div class="fg-row">
+        <div class="fg"><label>整体动销率</label><input type="text" id="movingRate" placeholder="65%"></div>
+        <div class="fg"><label>库存周转天数</label><input type="text" id="turnoverDays" placeholder="鞋45天/服60天/配90天"></div>
+      </div>
+      <div class="fg-row">
+        <div class="fg"><label>滞销款库存占比</label><input type="text" id="stagnantInvRatio" placeholder="25%"></div>
+        <div class="fg"><label>核心款售罄率</label><input type="text" id="selloutRate" placeholder="78%"></div>
+        <div class="fg"><label>进销匹配度</label><input type="text" id="purchaseSalesMatch" placeholder="进销比1.2:1"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="cardCat">
+    <div class="card-hd" onclick="toggleCard('cardCat')">
+      <div class="icon ic-cat">🏷️</div>
+      <div>
+        <h3>品类结构</h3>
+        <p>销售贡献、价格带、爆款/长尾</p>
+      </div>
+    </div>
+    <div class="card-bd">
+      <div class="fg">
+        <label>鞋服配销售贡献占比 <span class="req">*</span></label>
+        <input type="text" id="categoryContribution" placeholder="鞋50% / 服38% / 配12%">
+      </div>
+      <div class="fg-row">
+        <div class="fg"><label>价格带分布</label><input type="text" id="priceBand" placeholder="低30%/中45%/高25%"></div>
+        <div class="fg"><label>爆款/长尾占比</label><input type="text" id="bestsellerLongtail" placeholder="爆款60%/长尾40%"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card collapsed" id="cardOpt">
+    <div class="card-hd" onclick="toggleCard('cardOpt')">
+      <div class="icon ic-opt">➕</div>
+      <div>
+        <h3>可选补充（选填）</h3>
+        <p>会员偏好、场景、竞品</p>
+      </div>
+    </div>
+    <div class="card-bd">
+      <div class="fg"><label>会员复购品类偏好</label><input type="text" id="memberRepurchase" placeholder="会员复购鞋类占比最高42%"></div>
+      <div class="fg"><label>场景化商品销售数据</label><input type="text" id="scenarioSales" placeholder="运动场景35% / 通勤28%"></div>
+      <div class="fg"><label>周边竞品商品结构</label><input type="text" id="competitorAnalysis" placeholder="竞品A鞋类SKU占比50%"></div>
+    </div>
+  </div>
+
+  <div style="height:100px;"></div>
+
+  <div class="fab-wrap">
+    <button class="btn btn-outline" onclick="fillExample()">示例</button>
+    <button class="btn btn-primary" onclick="generateReport()">🚀 生成分析报告</button>
+  </div>
+</div>
+
+<!-- ========== 结果页 ========== -->
+<div id="pageResult" class="page">
+  <div class="result-nav">
+    <div class="nav-chip active" onclick="scrollToSec('secIntro')">📋概述</div>
+    <div class="nav-chip" onclick="scrollToSec('secYiWu')">📦易物提销</div>
+    <div class="nav-chip" onclick="scrollToSec('secYueRen')">💫悦人增黏</div>
+    <div class="nav-chip" onclick="scrollToSec('secAction')">🎯落地动作</div>
+  </div>
+
+  <div id="secIntro" class="section">
+    <div class="section-hd"><span class="dot dot-blue"></span>门店商品经营AI分析报告</div>
+    <div id="bodyIntro" class="report-body"><p>正在生成报告...</p></div>
+  </div>
+
+  <div id="secYiWu" class="section">
+    <div class="section-hd"><span class="dot dot-gold"></span>易物提销 · 商品价值重构</div>
+    <div id="bodyYiWu" class="report-body"><p>正在生成...</p></div>
+  </div>
+
+  <div id="secYueRen" class="section">
+    <div class="section-hd"><span class="dot dot-gold"></span>悦人增黏 · 情绪价值赋能</div>
+    <div id="bodyYueRen" class="report-body"><p>正在生成...</p></div>
+  </div>
+
+  <div id="secAction" class="section">
+    <div class="section-hd"><span class="dot dot-green"></span>优先级落地动作</div>
+    <div id="bodyAction" class="report-body"><p>正在生成...</p></div>
+  </div>
+
+  <div style="height:100px;"></div>
+
+  <div class="fab-wrap">
+    <button class="btn btn-outline" onclick="goBack()">← 返回</button>
+    <button class="btn btn-accent" onclick="copyReport()">📋复制</button>
+    <button class="btn btn-primary" onclick="window.print()">🖨️打印</button>
+  </div>
+</div>
+
+<script>
+// ==================== Config ====================
+const CFG_KEY = 'raa_config_v2';
+const PRESETS = {
+  volc: { baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'doubao-1-5-pro-256k-250115' },
+  openai: { baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o' },
+  dashscope: { baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-max' },
+  custom: { baseUrl: '', model: '' }
+};
+
+let abortCtrl = null;
+
+function getCfg() {
+  try { return JSON.parse(localStorage.getItem(CFG_KEY)) || {}; } catch { return {}; }
+}
+function setCfg(obj) { localStorage.setItem(CFG_KEY, JSON.stringify(obj)); }
+
+function applyPreset() {
+  const p = PRESETS[document.getElementById('apiPreset').value];
+  if (p) { document.getElementById('baseUrl').value = p.baseUrl; document.getElementById('modelName').value = p.model; }
+}
+
+function toggleConfig() {
+  const el = document.getElementById('configPanel');
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  if (el.style.display === 'block') {
+    const c = getCfg();
+    if (c.baseUrl) document.getElementById('baseUrl').value = c.baseUrl;
+    if (c.apiKey) document.getElementById('apiKey').value = c.apiKey;
+    if (c.model) document.getElementById('modelName').value = c.model;
+  }
+}
+
+function updateCfgStatus() {
+  const el = document.getElementById('cfgStatus');
+  const c = getCfg();
+  if (!c.apiKey) {
+    el.className = 'cfg-status warn'; el.textContent = '⚠️ 未配置API Key，点击「配置API」进行设置';
+    el.style.display = 'flex';
+  } else {
+    el.className = 'cfg-status ok'; el.textContent = `✅ 已配置 ${c.model || '模型'}，可以生成报告`;
+    el.style.display = 'flex';
+  }
+}
+
+function saveConfig() {
+  const c = {
+    baseUrl: document.getElementById('baseUrl').value.trim(),
+    apiKey: document.getElementById('apiKey').value.trim(),
+    model: document.getElementById('modelName').value.trim()
+  };
+  if (!c.apiKey) { showToast('请先填写API Key'); return; }
+  if (!c.model) { showToast('请填写模型ID'); return; }
+  setCfg(c);
+  updateCfgStatus();
+  showToast('✅ 配置已保存到本机！');
+}
+
+async function testApi() {
+  const c = {
+    baseUrl: document.getElementById('baseUrl').value.trim(),
+    apiKey: document.getElementById('apiKey').value.trim(),
+    model: document.getElementById('modelName').value.trim()
+  };
+  if (!c.apiKey) { showToast('请先填写API Key'); return; }
+  if (!c.model) { showToast('请填写模型ID'); return; }
+  showToast('正在测试连接...');
+  try {
+    const resp = await fetchWithTimeout(`${c.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${c.apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: c.model, messages: [{role:'user',content:'你好'}], max_tokens: 5 })
+    }, 15000);
+    if (resp.ok) {
+      showToast('✅ API连接成功！可以开始生成报告');
+      saveConfig();
+    } else {
+      const d = await resp.json().catch(()=>({}));
+      showToast('❌ 失败: ' + (d.error?.message || resp.status));
+      showErrorPanel('测试连接失败', d.error?.message || `HTTP ${resp.status}`, getHint(resp.status, d.error?.message));
+    }
+  } catch(e) {
+    showToast('❌ 连接失败: ' + e.message);
+    showErrorPanel('测试连接失败', e.message, getHint(null, e.message));
+  }
+}
+
+function getHint(status, msg) {
+  msg = (msg || '').toLowerCase();
+  if (msg.includes('cors') || msg.includes('failed to fetch') || msg.includes('network')) {
+    return `【跨域(CORS)问题】您当前是从本地文件(file://)打开此页面，浏览器可能阻止了向AI服务的请求。
+
+解决方案（任选其一）：
+1. 把此HTML文件部署到任意静态托管服务（如GitHub Pages、腾讯云开发、阿里云OSS等）后再访问
+2. 使用电脑端版本（含后端代理，无CORS限制）
+3. 换用支持浏览器直接调用的API（部分海外API如OpenAI支持CORS）`;
+  }
+  if (status === 401 || msg.includes('unauthorized') || msg.includes('invalid api key')) {
+    return `【API Key错误】请检查：
+1. API Key是否复制完整（不要有多余空格）
+2. API Key是否已过期或被删除
+3. 是否切换了正确的项目空间`;
+  }
+  if (status === 404 || msg.includes('model') || msg.includes('not found')) {
+    return `【模型ID错误】火山方舟需要填「推理接入点ID」（ep-开头），不是模型名称。
+
+操作步骤：
+1. 登录火山方舟 → 在线推理 → 创建推理接入点
+2. 选择已开通的豆包模型 → 创建
+3. 复制「Endpoint ID」（格式：ep-xxxxxxxx）
+4. 把模型字段改成这个ID`;
+  }
+  if (status === 429 || msg.includes('rate limit') || msg.includes('quota')) {
+    return `【额度不足或频率限制】请检查：
+1. 账户是否有足够的调用额度
+2. 是否触发了频率限制，稍后再试`;
+  }
+  if (status === 403 || msg.includes('forbidden')) {
+    return `【权限不足】当前API Key没有权限调用该模型，请检查：
+1. 模型是否已开通
+2. API Key所在项目是否有该模型的访问权限`;
+  }
+  return `【通用排查】
+1. 检查网络连接是否正常
+2. 确认Base URL填写正确
+3. 确认模型ID/推理接入点ID正确
+4. 如持续失败，建议换用电脑端版本`;
+}
+
+// ==================== Network ====================
+function fetchWithTimeout(url, options, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('请求超时，请检查网络或稍后重试')), timeoutMs);
+    fetch(url, options).then(r => { clearTimeout(timer); resolve(r); }, e => { clearTimeout(timer); reject(e); });
+  });
+}
+
+function cancelRequest() {
+  if (abortCtrl) { abortCtrl.abort(); abortCtrl = null; }
+  document.getElementById('loadingMask').classList.remove('active');
+  showToast('已取消');
+}
+
+// ==================== UI Helpers ====================
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+function toggleCard(id) {
+  document.getElementById(id).classList.toggle('collapsed');
+}
+function scrollToSec(id) {
+  document.getElementById(id).scrollIntoView({ behavior: 'smooth', block: 'start' });
+  document.querySelectorAll('.nav-chip').forEach(c => c.classList.remove('active'));
+  event.target.classList.add('active');
+}
+function goBack() {
+  document.getElementById('pageResult').classList.remove('active');
+  document.getElementById('pageInput').classList.add('active');
+  window.scrollTo(0,0);
+}
+
+function showErrorPanel(title, detail, hint) {
+  const panel = document.getElementById('errorPanel');
+  document.getElementById('errorDetail').textContent = title + '\n' + detail;
+  const hintEl = document.getElementById('errorHint');
+  if (hint) { hintEl.textContent = hint; hintEl.style.display = 'block'; }
+  else { hintEl.style.display = 'none'; }
+  panel.style.display = 'block';
+  panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+function hideErrorPanel() {
+  document.getElementById('errorPanel').style.display = 'none';
+}
+
+// ==================== Example Data ====================
+const EXAMPLE = {
+  totalSku:'1200', shoeSku:'35%', clothingSku:'50%', accessorySku:'15%',
+  newSku:'30%', stagnantSku:'20%', 联名Sku:'8%',
+  salesAmountRatio:'鞋45% / 服40% / 配15%',
+  movingRate:'65%', turnoverDays:'鞋45天 / 服60天 / 配90天',
+  stagnantInvRatio:'25%', selloutRate:'78%',
+  purchaseSalesMatch:'进销比1.2:1，鞋类备货偏紧',
+  categoryContribution:'鞋50% / 服38% / 配12%',
+  priceBand:'低(＜300)30% / 中(300-800)45% / 高(＞800)25%',
+  bestsellerLongtail:'爆款TOP20贡献60% / 长尾40%',
+  memberRepurchase:'会员复购鞋类最高42%，服装33%，配饰25%',
+  scenarioSales:'运动场景35% / 通勤28% / 休闲22% / 社交15%',
+  competitorAnalysis:'竞品A鞋类SKU占比50%，联名限量款多；竞品B主打高性价比服装'
+};
+
+function fillExample() {
+  Object.entries(EXAMPLE).forEach(([k,v]) => { const el = document.getElementById(k); if(el) el.value = v; });
+  ['cardSku','cardSales','cardCat','cardOpt'].forEach(id => document.getElementById(id).classList.remove('collapsed'));
+  hideErrorPanel();
+  showToast('示例数据已填充');
+}
+function clearAll() {
+  document.querySelectorAll('input[type="text"], input[type="password"]').forEach(i => i.value = '');
+  hideErrorPanel();
+  showToast('已清空');
+}
+
+function collectData() {
+  const v = id => document.getElementById(id)?.value || '';
+  return {
+    total_sku: v('totalSku'), shoe_sku_ratio: v('shoeSku'), clothing_sku_ratio: v('clothingSku'),
+    accessory_sku_ratio: v('accessorySku'), new_sku_ratio: v('newSku'), stagnant_sku_ratio: v('stagnantSku'),
+    联名_limit_sustainable_ratio: v('联名Sku'),
+    sales_amount_ratio: v('salesAmountRatio'), sales_volume_ratio: '',
+    overall_moving_rate: v('movingRate'), inventory_turnover_days: v('turnoverDays'),
+    stagnant_inventory_ratio: v('stagnantInvRatio'), core_sellout_rate: v('selloutRate'),
+    purchase_sales_match: v('purchaseSalesMatch'),
+    category_contribution: v('categoryContribution'), price_band_distribution: v('priceBand'),
+    bestseller_longtail_ratio: v('bestsellerLongtail'),
+    member_repurchase: v('memberRepurchase'), scenario_sales: v('scenarioSales'),
+    competitor_analysis: v('competitorAnalysis')
+  };
+}
+
+// ==================== Markdown Render ====================
+function mdToHtml(md) {
+  let h = md
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/```([\s\S]*?)```/g,'<pre style="background:#f7fafc;padding:0.5rem;border-radius:0.4rem;overflow-x:auto;font-size:0.78rem;"><code>$1</code></pre>')
+    .replace(/^#{4}\s+(.+)$/gm,'<h4 style="font-size:0.9rem;color:var(--primary);margin:0.75rem 0 0.4rem;font-weight:700;">$1</h4>')
+    .replace(/^#{3}\s+(.+)$/gm,'<h3 style="font-size:0.95rem;color:var(--primary);margin:0.875rem 0 0.5rem;font-weight:700;">$1</h3>')
+    .replace(/^#{2}\s+(.+)$/gm,'<h2 style="font-size:1rem;color:var(--primary);margin:1rem 0 0.5rem;font-weight:700;border-bottom:2px solid var(--accent);padding-bottom:0.3rem;">$1</h2>')
+    .replace(/^#{1}\s+(.+)$/gm,'<h1 style="font-size:1.05rem;color:var(--primary);margin:1rem 0 0.5rem;font-weight:700;border-bottom:2px solid var(--accent);padding-bottom:0.3rem;">$1</h1>')
+    .replace(/\*\*\*(.+?)\*\*\*/g,'<strong><em>$1</em></strong>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/^&gt;\s+(.+)$/gm,'<blockquote>$1</blockquote>')
+    .replace(/^\s*[-*+]\s+(.+)$/gm,'<li>$1</li>')
+    .replace(/^\s*\d+\.\s+(.+)$/gm,'<li>$1</li>')
+    .replace(/`([^`]+)`/g,'<code style="background:#f7fafc;padding:0.1rem 0.3rem;border-radius:0.2rem;font-size:0.8rem;">$1</code>')
+    .replace(/\n\n/g,'</p><p>')
+    .replace(/\n/g,'<br>');
+  h = h.replace(/(<li>.*?<\/li>)(\s*(?=<li>|$))/gs,'<ul style="margin:0.4rem 0 0.6rem 1.2rem;">$1</ul>');
+  h = h.replace(/<\/ul>\s*<ul[^>]*>/g,'');
+  if (!h.startsWith('<')) h = '<p>' + h;
+  if (!h.endsWith('>')) h += '</p>';
+  h = h.replace(/<p><(h|ul|blockquote|pre)/g,'<$1');
+  h = h.replace(/<\/(h[1-6]|ul|blockquote|pre)><\/p>/g,'</$1>');
+  return h;
+}
+
+function splitReport(content) {
+  const r = { intro:'', yiwu:'', yueren:'', action:'' };
+  const lines = content.split('\n');
+  let cur = 'intro';
+  const ywK = ['易物提销','商品价值重构','商品结构优化','动销提速','库存周转','社交货币化','闲置价值','商品场景化','流通效率'];
+  const yrK = ['悦人增黏','情绪价值','社交场景','兴趣场景','仪式场景','圈层运营','IP联名','社群活动','体验型商品'];
+  const acK = ['优先级','落地动作','预期经营效果','快速执行','3条','三条'];
+  for (const line of lines) {
+    const l = line.toLowerCase();
+    if (ywK.some(k=>l.includes(k.toLowerCase())) && !yrK.some(k=>l.includes(k.toLowerCase()))) cur='yiwu';
+    else if (yrK.some(k=>l.includes(k.toLowerCase())) && !acK.some(k=>l.includes(k.toLowerCase()))) cur='yueren';
+    else if (acK.some(k=>l.includes(k.toLowerCase()))) cur='action';
+    r[cur] += line + '\n';
+  }
+  if (r.yiwu.length<50 || r.yueren.length<50) {
+    const parts = content.split(/\n\n+/).filter(p=>p.trim().length>20);
+    const sz = Math.ceil(parts.length/3);
+    r.intro = parts.slice(0,sz).join('\n\n');
+    r.yiwu = parts.slice(sz,sz*2).join('\n\n');
+    r.yueren = parts.slice(sz*2,sz*3).join('\n\n');
+    r.action = parts.slice(sz*3).join('\n\n');
+  }
+  return r;
+}
+
+// ==================== Generate Report ====================
+let reportRaw = '';
+
+function buildPrompt(data) {
+  const sku = `总SKU量：${data.total_sku || '未填写'}
+鞋/服/配SKU占比：${data.shoe_sku_ratio || '未填写'} / ${data.clothing_sku_ratio || '未填写'} / ${data.accessory_sku_ratio || '未填写'}
+新品/滞销品SKU占比：${data.new_sku_ratio || '未填写'} / ${data.stagnant_sku_ratio || '未填写'}
+联名/限量/可持续类话题性SKU占比：${data.联名_limit_sustainable_ratio || '未填写'}`;
+
+  const sales = `各品类销售额/销量占比：${data.sales_amount_ratio || '未填写'}
+整体动销率：${data.overall_moving_rate || '未填写'}
+分品类库存周转天数：${data.inventory_turnover_days || '未填写'}
+滞销款库存占比：${data.stagnant_inventory_ratio || '未填写'}
+核心款售罄率：${data.core_sellout_rate || '未填写'}
+进销匹配度：${data.purchase_sales_match || '未填写'}`;
+
+  const cat = `鞋服配销售贡献占比：${data.category_contribution || '未填写'}
+价格带分布：${data.price_band_distribution || '未填写'}
+爆款/长尾款销售占比：${data.bestseller_longtail_ratio || '未填写'}`;
+
+  const optParts = [];
+  if (data.member_repurchase) optParts.push(`会员复购品类偏好：${data.member_repurchase}`);
+  if (data.scenario_sales) optParts.push(`场景化商品销售数据：${data.scenario_sales}`);
+  if (data.competitor_analysis) optParts.push(`周边竞品商品结构：${data.competitor_analysis}`);
+  const opt = optParts.length ? optParts.join('\n') : '无补充数据';
+
+  return `你是实体零售商品运营专家，深度掌握「易物+悦人」双轨共生的零售经营逻辑，擅长基于门店经营数据输出可落地、可量化的商品经营管理优化方案。
+
+请根据以下门店经营数据，从「易物提销·商品价值重构」与「悦人增黏·情绪价值赋能」两大核心维度，出具完整的门店商品经营管理建议：
+
+【门店经营数据输入】
+
+1. SKU结构：
+${sku}
+
+2. 进销存表现：
+${sales}
+
+3. 品类结构：
+${cat}
+
+4. 可选补充：
+${opt}
+
+【输出规则】
+
+1. 易物提销维度：围绕商品流通效率与价值循环，针对性输出商品结构优化、动销提速、库存周转改善、社交货币化商品（联名/限量/环保款）打造、闲置价值激活（以旧换新/旧物改造）、商品场景化延伸等方向的具体动作，匹配对应品类数据给出调整比例与执行路径；
+
+2. 悦人增黏维度：围绕情绪价值与圈层运营，输出适配社交/兴趣/仪式三大场景的商品组合方案、文化/IP联名款运营策略、社群活动配套商品规划、体验型商品（定制/手作类）落地建议，结合门店客群特征给出可执行的商品运营动作；
+
+3. 末尾输出3条优先级最高的落地动作及对应预期经营效果，确保方案贴合门店实际、可快速执行验证。
+
+请用专业且易于执行的语言输出，结构清晰，每个建议都要具体可量化。`;
+}
+
+async function generateReport() {
+  hideErrorPanel();
+  const data = collectData();
+  if (!data.total_sku || !data.sales_amount_ratio || !data.category_contribution) {
+    showToast('请至少填写3个必填项（带*号）');
+    document.getElementById('cardSku').classList.remove('collapsed');
+    document.getElementById('cardSales').classList.remove('collapsed');
+    document.getElementById('cardCat').classList.remove('collapsed');
+    return;
+  }
+  const cfg = getCfg();
+  if (!cfg.apiKey) { showToast('请先配置API Key'); toggleConfig(); return; }
+
+  document.getElementById('loadingText').textContent = '正在连接AI服务，请稍候（最多等待60秒）';
+  document.getElementById('loadingMask').classList.add('active');
+  reportRaw = '';
+  abortCtrl = new AbortController();
+
+  try {
+    const resp = await fetchWithTimeout(`${cfg.baseUrl}/chat/completions`, {
+      method: 'POST',
+      signal: abortCtrl.signal,
+      headers: { 'Authorization': `Bearer ${cfg.apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: cfg.model,
+        messages: [
+          { role: 'system', content: '你是一个专业的实体零售商品运营专家。' },
+          { role: 'user', content: buildPrompt(data) }
+        ],
+        stream: false,
+        temperature: 0.7,
+        max_tokens: 8000
+      })
+    }, 60000);
+
+    if (!resp.ok) {
+      const errBody = await resp.text();
+      let errObj = {};
+      try { errObj = JSON.parse(errBody); } catch {}
+      throw { status: resp.status, message: errObj.error?.message || errBody || `HTTP ${resp.status}`, body: errObj };
+    }
+
+    const result = await resp.json();
+    reportRaw = result.choices?.[0]?.message?.content || JSON.stringify(result);
+
+    if (!reportRaw || reportRaw.length < 50) {
+      throw { message: 'AI返回内容为空或异常', body: result };
+    }
+
+    document.getElementById('pageInput').classList.remove('active');
+    document.getElementById('pageResult').classList.add('active');
+    window.scrollTo(0,0);
+
+    const parts = splitReport(reportRaw);
+    document.getElementById('bodyIntro').innerHTML = mdToHtml(parts.intro || reportRaw.substring(0,500));
+    document.getElementById('bodyYiWu').innerHTML = mdToHtml(parts.yiwu || '');
+    document.getElementById('bodyYueRen').innerHTML = mdToHtml(parts.yueren || '');
+    document.getElementById('bodyAction').innerHTML = mdToHtml(parts.action || '');
+
+  } catch(e) {
+    if (e.name === 'AbortError') { showToast('已取消'); return; }
+    const status = e.status || '';
+    const msg = e.message || e.toString();
+    console.error('Generate error:', e);
+    showToast('生成失败: ' + msg);
+    showErrorPanel(
+      status ? `HTTP ${status}` : '请求异常',
+      msg + (e.body ? '\n\n' + JSON.stringify(e.body, null, 2) : ''),
+      getHint(status, msg)
+    );
+  } finally {
+    document.getElementById('loadingMask').classList.remove('active');
+    abortCtrl = null;
+  }
+}
+
+function copyReport() {
+  if (!reportRaw) return;
+  navigator.clipboard?.writeText(reportRaw).then(()=>showToast('报告已复制！')).catch(()=>{
+    const ta = document.createElement('textarea'); ta.value = reportRaw;
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta); showToast('报告已复制！');
+  });
+}
+
+// ==================== Init ====================
+document.addEventListener('DOMContentLoaded', () => {
+  updateCfgStatus();
+  const c = getCfg();
+  if (c.baseUrl) document.getElementById('baseUrl').value = c.baseUrl;
+  if (c.apiKey) document.getElementById('apiKey').value = c.apiKey;
+  if (c.model) document.getElementById('modelName').value = c.model;
+});
+</script>
+</body>
+</html>

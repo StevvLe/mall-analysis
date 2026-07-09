@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>门店商品经营AI分析助手</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="header">
+    <h1>门店商品经营AI分析助手</h1>
+    <p>基于「易物+悦人」双轨共生逻辑，智能输出可落地的商品经营管理优化方案</p>
+    <span class="badge">AI驱动 · 数据赋能 · 决策提效</span>
+  </header>
+
+  <!-- Loading Overlay -->
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="spinner"></div>
+    <div class="loading-text">AI正在分析门店数据<span class="loading-dots"></span></div>
+    <div class="loading-sub">请稍候，正在生成易物提销与悦人增黏双维度经营建议</div>
+  </div>
+
+  <!-- Main Content -->
+  <main class="container">
+
+    <!-- ========== 输入页面 ========== -->
+    <div id="inputPage" class="page active">
+      <!-- API Config Alert -->
+      <div id="configAlert" class="alert alert-warning" style="display:none;">
+        ⚠️ 未检测到AI API Key配置，请点击下方「配置API」按钮进行设置，否则无法生成分析报告。
+      </div>
+
+      <!-- Toolbar -->
+      <div class="toolbar">
+        <button class="btn btn-secondary" onclick="fillExample()">📋 填入示例数据</button>
+        <button class="btn btn-secondary" onclick="clearForm()">🗑️ 清空表单</button>
+        <button class="btn btn-secondary" onclick="toggleConfig()">⚙️ 配置API</button>
+        <div style="flex:1"></div>
+        <button class="btn btn-primary" onclick="generateReport()">🚀 生成分析报告</button>
+      </div>
+
+      <!-- Config Panel -->
+      <div id="configPanel" class="config-panel" style="display:none;">
+        <div class="config-panel-title">API 配置（数据仅存储在浏览器本地）</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>API Base URL</label>
+            <input type="text" id="cfgBaseUrl" placeholder="https://ark.cn-beijing.volces.com/api/v3">
+          </div>
+          <div class="form-group">
+            <label>API Key <span class="required">*</span></label>
+            <input type="password" id="cfgApiKey" placeholder="请输入您的AI API Key">
+          </div>
+          <div class="form-group">
+            <label>模型名称</label>
+            <input type="text" id="cfgModel" placeholder="doubao-1-5-pro-256k-250115">
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <button class="btn btn-primary" onclick="saveConfig()" style="font-size:0.85rem;padding:0.4rem 0.8rem;">保存配置</button>
+        </div>
+      </div>
+
+      <!-- SKU Structure -->
+      <div class="card">
+        <div class="card-header">
+          <div class="icon icon-sku">📦</div>
+          <div>
+            <h3>SKU结构</h3>
+            <p>鞋服配品类占比、新品与滞销品结构、话题性SKU分布</p>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label>总SKU量 <span class="required">*</span></label>
+              <input type="text" id="totalSku" placeholder="例如：1200">
+              <span class="hint">门店当前总SKU数量</span>
+            </div>
+            <div class="form-group">
+              <label>鞋类SKU占比</label>
+              <input type="text" id="shoeSku" placeholder="例如：35%">
+            </div>
+            <div class="form-group">
+              <label>服装SKU占比</label>
+              <input type="text" id="clothingSku" placeholder="例如：50%">
+            </div>
+            <div class="form-group">
+              <label>配饰SKU占比</label>
+              <input type="text" id="accessorySku" placeholder="例如：15%">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>新品SKU占比</label>
+              <input type="text" id="newSku" placeholder="例如：30%">
+            </div>
+            <div class="form-group">
+              <label>滞销品SKU占比</label>
+              <input type="text" id="stagnantSku" placeholder="例如：20%">
+            </div>
+            <div class="form-group">
+              <label>联名/限量/可持续类话题性SKU占比</label>
+              <input type="text" id="联名Sku" placeholder="例如：8%">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sales & Inventory -->
+      <div class="card">
+        <div class="card-header">
+          <div class="icon icon-sales">📊</div>
+          <div>
+            <h3>进销存表现</h3>
+            <p>销售数据、动销率、库存周转、售罄率等核心指标</p>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label>各品类销售额/销量占比 <span class="required">*</span></label>
+              <input type="text" id="salesAmountRatio" placeholder="例如：鞋45% / 服40% / 配15%">
+              <span class="hint">按品类分列的销售额或销量占比</span>
+            </div>
+            <div class="form-group">
+              <label>整体动销率</label>
+              <input type="text" id="movingRate" placeholder="例如：65%">
+            </div>
+            <div class="form-group">
+              <label>分品类库存周转天数</label>
+              <input type="text" id="turnoverDays" placeholder="例如：鞋45天 / 服60天 / 配90天">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>滞销款库存占比</label>
+              <input type="text" id="stagnantInvRatio" placeholder="例如：25%">
+            </div>
+            <div class="form-group">
+              <label>核心款售罄率</label>
+              <input type="text" id="selloutRate" placeholder="例如：78%">
+            </div>
+            <div class="form-group">
+              <label>进销匹配度</label>
+              <input type="text" id="purchaseSalesMatch" placeholder="例如：进销比1.2:1，基本匹配">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Category Structure -->
+      <div class="card">
+        <div class="card-header">
+          <div class="icon icon-category">🏷️</div>
+          <div>
+            <h3>品类结构</h3>
+            <p>销售贡献、价格带分布、爆款与长尾结构</p>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label>鞋服配销售贡献占比 <span class="required">*</span></label>
+              <input type="text" id="categoryContribution" placeholder="例如：鞋50% / 服38% / 配12%">
+            </div>
+            <div class="form-group">
+              <label>价格带分布</label>
+              <input type="text" id="priceBand" placeholder="例如：低30% / 中45% / 高25%">
+            </div>
+            <div class="form-group">
+              <label>爆款/长尾款销售占比</label>
+              <input type="text" id="bestsellerLongtail" placeholder="例如：爆款60% / 长尾40%">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Optional Supplement -->
+      <div class="card">
+        <div class="card-header">
+          <div class="icon icon-optional">➕</div>
+          <div>
+            <h3>可选补充数据</h3>
+            <p>会员偏好、场景销售、竞品分析（选填，填了分析更精准）</p>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label>会员复购品类偏好</label>
+              <input type="text" id="memberRepurchase" placeholder="例如：会员复购鞋类占比最高，达42%">
+            </div>
+            <div class="form-group">
+              <label>场景化商品销售数据</label>
+              <input type="text" id="scenarioSales" placeholder="例如：运动场景占35%，通勤场景占28%">
+            </div>
+            <div class="form-group">
+              <label>周边竞品商品结构</label>
+              <input type="text" id="competitorAnalysis" placeholder="例如：竞品A鞋类SKU占比达50%，联名款较多">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Submit -->
+      <div style="text-align:center; margin: 2rem 0;">
+        <button class="btn btn-primary" style="font-size:1.1rem;padding:0.8rem 2.5rem;" onclick="generateReport()">
+          🚀 生成AI分析报告
+        </button>
+      </div>
+    </div>
+
+    <!-- ========== 结果页面 ========== -->
+    <div id="resultPage" class="page">
+      <div class="toolbar">
+        <button class="btn btn-secondary" onclick="goBack()">← 返回修改数据</button>
+        <div style="flex:1"></div>
+        <button class="btn btn-accent" onclick="copyReport()">📋 复制报告</button>
+        <button class="btn btn-primary" onclick="window.print()">🖨️ 打印报告</button>
+      </div>
+
+      <div class="result-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+          <div class="sidebar-card">
+            <div class="sidebar-title">报告目录</div>
+            <ul class="toc-list">
+              <li class="active" onclick="scrollToSection('reportIntro')" data-target="reportIntro">📋 报告概述</li>
+              <li onclick="scrollToSection('reportYiWu')" data-target="reportYiWu">📦 易物提销建议</li>
+              <li onclick="scrollToSection('reportYueRen')" data-target="reportYueRen">💫 悦人增黏建议</li>
+              <li onclick="scrollToSection('reportAction')" data-target="reportAction">🎯 优先级落地动作</li>
+            </ul>
+          </div>
+        </aside>
+
+        <!-- Content -->
+        <div class="result-content">
+          <div id="reportIntro" class="section" style="position:relative;">
+            <div class="section-title">
+              <span class="dot dot-blue"></span>
+              门店商品经营AI分析报告
+            </div>
+            <div id="reportIntroBody" class="report-body">
+              <p>正在生成报告，请稍候...</p>
+            </div>
+          </div>
+
+          <div id="reportYiWu" class="section" style="position:relative;">
+            <div class="section-title">
+              <span class="dot dot-gold"></span>
+              易物提销 · 商品价值重构
+            </div>
+            <div id="reportYiWuBody" class="report-body">
+              <p>正在生成易物提销维度建议...</p>
+            </div>
+          </div>
+
+          <div id="reportYueRen" class="section" style="position:relative;">
+            <div class="section-title">
+              <span class="dot dot-gold"></span>
+              悦人增黏 · 情绪价值赋能
+            </div>
+            <div id="reportYueRenBody" class="report-body">
+              <p>正在生成悦人增黏维度建议...</p>
+            </div>
+          </div>
+
+          <div id="reportAction" class="section" style="position:relative;">
+            <div class="section-title">
+              <span class="dot dot-green"></span>
+              优先级落地动作
+            </div>
+            <div id="reportActionBody" class="report-body">
+              <p>正在生成优先级动作...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <script src="/static/script.js"></script>
+</body>
+</html>
