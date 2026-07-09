@@ -6,12 +6,12 @@
 import os
 import json
 import httpx
-from fastapi import FastAPI, Request, Form
+from pathlib import Path
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
-from typing import Optional
 
 # ==================== 配置区（请根据实际情况修改） ====================
 # AI API配置 - 支持OpenAI兼容接口
@@ -21,10 +21,11 @@ AI_MODEL = os.getenv("AI_MODEL", "doubao-1-5-pro-256k-250115")
 # =====================================================================
 
 app = FastAPI(title="门店商品经营AI分析助手")
+BASE_DIR = Path(__file__).resolve().parent
 
 # 挂载静态文件和模板
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
+app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
 
 class StoreData(BaseModel):
@@ -128,6 +129,12 @@ def build_prompt(data: StoreData) -> str:
 async def index(request: Request):
     """首页 - 数据输入表单"""
     return templates.TemplateResponse("index.html", {"request": request})
+
+
+@app.get("/healthz")
+async def healthz():
+    """健康检查接口"""
+    return {"ok": True}
 
 
 @app.post("/api/analyze")
