@@ -128,7 +128,7 @@ def build_prompt(data: StoreData) -> str:
 @app.get("/")
 async def index(request: Request):
     """首页 - 数据输入表单"""
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(request, "index.html")
 
 
 @app.get("/healthz")
