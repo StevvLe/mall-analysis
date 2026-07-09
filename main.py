@@ -125,6 +125,49 @@ def build_prompt(data: StoreData) -> str:
     )
 
 
+def parse_ai_error(response: httpx.Response) -> str:
+    """提取AI接口错误，确保前端拿到可读JSON而不是HTML错误页。"""
+    try:
+        body = response.json()
+    except json.JSONDecodeError:
+        text = response.text.strip()
+        return text[:500] if text else f"HTTP {response.status_code}"
+
+    error = body.get("error") if isinstance(body, dict) else None
+    if isinstance(error, dict):
+        return error.get("message") or json.dumps(error, ensure_ascii=False)
+    if isinstance(error, str):
+        return error
+    return json.dumps(body, ensure_ascii=False)[:500]
+
+
+async def request_ai_completion(prompt: str, stream: bool):
+    """调用OpenAI兼容接口，并把上游异常规范化。"""
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        response = await client.post(
+            f"{AI_BASE_URL.rstrip('/')}/chat/completions",
+            headers={
+                "Authorization": f"Bearer {AI_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": AI_MODEL,
+                "messages": [
+                    {"role": "system", "content": "你是一个专业的实体零售商品运营专家。"},
+                    {"role": "user", "content": prompt}
+                ],
+                "stream": stream,
+                "temperature": 0.7,
+                "max_tokens": 8000
+            }
+        )
+
+    if response.status_code >= 400:
+        raise RuntimeError(f"AI接口请求失败（HTTP {response.status_code}）：{parse_ai_error(response)}")
+
+    return response
+
+
 @app.get("/")
 async def index(request: Request):
     """首页 - 数据输入表单"""
@@ -153,7 +196,7 @@ async def analyze(data: StoreData):
         async with httpx.AsyncClient(timeout=120.0) as client:
             try:
                 response = await client.post(
-                    f"{AI_BASE_URL}/chat/completions",
+                    f"{AI_BASE_URL.rstrip('/')}/chat/completions",
                     headers={
                         "Authorization": f"Bearer {AI_API_KEY}",
                         "Content-Type": "application/json"
@@ -169,6 +212,11 @@ async def analyze(data: StoreData):
                         "max_tokens": 8000
                     }
                 )
+
+                if response.status_code >= 400:
+                    message = f"AI接口请求失败（HTTP {response.status_code}）：{parse_ai_error(response)}"
+                    yield f"data: {json.dumps({'error': message}, ensure_ascii=False)}\n\n"
+                    return
                 
                 async for line in response.aiter_lines():
                     if line.startswith("data: "):
@@ -202,28 +250,13 @@ async def analyze_sync(data: StoreData):
     
     prompt = build_prompt(data)
     
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        response = await client.post(
-            f"{AI_BASE_URL}/chat/completions",
-            headers={
-                "Authorization": f"Bearer {AI_API_KEY}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": AI_MODEL,
-                "messages": [
-                    {"role": "system", "content": "你是一个专业的实体零售商品运营专家。"},
-                    {"role": "user", "content": prompt}
-                ],
-                "stream": False,
-                "temperature": 0.7,
-                "max_tokens": 8000
-            }
-        )
-        
+    try:
+        response = await request_ai_completion(prompt, stream=False)
         result = response.json()
         content = result["choices"][0]["message"]["content"]
         return {"content": content}
+    except (httpx.HTTPError, RuntimeError, json.JSONDecodeError, KeyError, IndexError) as e:
+        return JSONResponse(status_code=502, content={"error": str(e)})
 
 
 @app.get("/api/config")

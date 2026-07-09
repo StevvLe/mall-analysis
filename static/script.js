@@ -37,13 +37,25 @@ function toggleConfig() {
   }
 }
 
-function checkConfig() {
+async function checkConfig() {
   const cfg = getConfig();
   const alertEl = document.getElementById('configAlert');
-  if (!cfg.apiKey) {
-    alertEl.style.display = 'flex';
-  } else {
+
+  try {
+    const resp = await fetch('/api/config');
+    const serverCfg = await resp.json();
+    if (serverCfg.has_api_key) {
+      alertEl.style.display = 'none';
+      return;
+    }
+  } catch (err) {
+    console.warn('读取服务端配置失败', err);
+  }
+
+  if (cfg.apiKey) {
     alertEl.style.display = 'none';
+  } else {
+    alertEl.style.display = 'flex';
   }
 }
 
@@ -210,18 +222,21 @@ function splitReport(content) {
 // ==================== 生成报告 ====================
 let currentReportRaw = '';
 
+async function readJsonResponse(resp) {
+  const text = await resp.text();
+  try {
+    return JSON.parse(text);
+  } catch (err) {
+    const brief = text.replace(/\s+/g, ' ').slice(0, 300);
+    throw new Error(brief || `服务返回了非JSON内容（HTTP ${resp.status}）`);
+  }
+}
+
 async function generateReport() {
   const data = collectData();
 
   if (!data.total_sku || !data.sales_amount_ratio || !data.category_contribution) {
     alert('请至少填写「总SKU量」「销售额占比」「销售贡献占比」三个必填项');
-    return;
-  }
-
-  const cfg = getConfig();
-  if (!cfg.apiKey) {
-    alert('请先配置AI API Key（点击「配置API」按钮）');
-    toggleConfig();
     return;
   }
 
@@ -239,11 +254,11 @@ async function generateReport() {
     });
 
     if (!resp.ok) {
-      const err = await resp.json();
+      const err = await readJsonResponse(resp);
       throw new Error(err.error || '请求失败');
     }
 
-    const result = await resp.json();
+    const result = await readJsonResponse(resp);
     currentReportRaw = result.content || result;
 
     // 切换到结果页
